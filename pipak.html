@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Pípák s přesným odpočtem</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+            background-color: #1e1e1e;
+            color: white;
+        }
+        #odpocet {
+            font-size: 100px;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 40px 0;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff0055;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            transition: 0.2s;
+        }
+        #btnStart { background-color: #4CAF50; }
+        #btnStart:hover { background-color: #45a049; }
+        #btnStop { background-color: #f44336; }
+        #btnStop:hover { background-color: #da190b; }
+        button:disabled { background-color: #555555; cursor: not-allowed; color: #888; }
+        
+        /* Upozornění na chování prohlížeče */
+        .varovani {
+            margin-top: 40px;
+            padding: 15px;
+            background-color: #333;
+            border-left: 5px solid #ff9800;
+            display: inline-block;
+            text-align: left;
+            max-width: 600px;
+            font-size: 14px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Časovač: 1 Minuta a 57 Vteřin</h1>
+    
+    <div id="odpocet">01:57.0</div>
+    
+    <button id="btnStart">SPUSTIT</button>
+    <button id="btnStop" disabled>ZASTAVIT</button>
+    
+    <br>
+    <div class="varovani">
+        <strong>Tip pro maximální přesnost:</strong> Pokud okno prohlížeče minimalizuješ nebo překryješ jinou záložkou, prohlížeč může odpočet po čase zpomalit. Pro 100% spolehlivost nechej toto okno alespoň částečně viditelné na monitoru.
+    </div>
+
+    <script>
+        let intervalId = null;
+        let audioCtx = null;
+        let cilovyCas = 0;
+        
+        // Změněno na 1 minutu (60000 ms) + 57 vteřin (57000 ms) = 117 000 ms
+        const INTERVAL = 117000; 
+
+        function pipni() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.type = 'sine'; 
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); 
+            
+            gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function aktualizujOdpocet() {
+            let nyni = Date.now();
+            let zbyvaMs = cilovyCas - nyni;
+
+            // Pokud čas vypršel, pípneme a okamžitě nastavíme další cíl (+ 1:57)
+            if (zbyvaMs <= 0) {
+                pipni();
+                // Přičítáme přesně k předchozímu cíli
+                cilovyCas += INTERVAL; 
+                zbyvaMs = cilovyCas - nyni;
+            }
+
+            // Výpočet minut, vteřin a desetin vteřiny pro zobrazení
+            let minuty = Math.floor(zbyvaMs / 60000);
+            let vteriny = Math.floor((zbyvaMs % 60000) / 1000);
+            let desetiny = Math.floor((zbyvaMs % 1000) / 100);
+
+            // Formátování textu, aby měl vždy správný počet nul (např. 01:05.3)
+            let formatovanyCas = 
+                String(minuty).padStart(2, '0') + ":" + 
+                String(vteriny).padStart(2, '0') + "." + 
+                desetiny;
+
+            document.getElementById('odpocet').innerText = formatovanyCas;
+        }
+
+        document.getElementById('btnStart').addEventListener('click', () => {
+            if (!intervalId) {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Nastavíme první cílový čas přesně za 1:57 od teď
+                cilovyCas = Date.now() + INTERVAL;
+                
+                // Kontrolní pípnutí na začátek
+                pipni(); 
+                
+                // Aktualizujeme displej každých 50 milisekund (velmi plynulý odpočet)
+                intervalId = setInterval(aktualizujOdpocet, 50);
+                
+                document.getElementById('btnStart').disabled = true;
+                document.getElementById('btnStop').disabled = false;
+                document.getElementById('odpocet').style.color = '#00ff00';
+            }
+        });
+
+        document.getElementById('btnStop').addEventListener('click', () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+                
+                // Nastavení displeje zpět na výchozí hodnotu po zastavení
+                document.getElementById('odpocet').innerText = "01:57.0";
+                document.getElementById('odpocet').style.color = '#ff3333';
+                
+                document.getElementById('btnStart').disabled = false;
+                document.getElementById('btnStop').disabled = true;
+            }
+        });
+    </script>
+</body>
+</html>
